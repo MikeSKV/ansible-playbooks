@@ -1,10 +1,10 @@
 ---
 - name: Setup kubectl on control node
   hosts: control
-  become: yes  # Используем sudo для создания директорий и установки прав
+  become: yes  # Используем sudo для создания директорий
   vars:
     k8s_version: "1.28.15"  # Синхронизировано с предыдущими файлами
-    target_user: "root"  # Замените на нужного пользователя, если не root
+    target_user: "root"  # Замените на нужного пользователя, если не root (например, ваш SSH-логин)
     ansible_user_dir: "{{ '/root' if target_user == 'root' else '/home/' + target_user }}"  # Динамический путь
   tasks:
     - name: Ensure target user exists
@@ -29,8 +29,10 @@
         dest: "{{ ansible_user_dir }}/.kube/config"
         flat: yes
       delegate_to: "{{ groups['k8s_master'][0] }}"
-      become: yes  # Выполняем от root для доступа к /root
+      become: yes  # Выполняем от root
       become_user: root
+      register: fetch_result
+      failed_when: fetch_result.rc != 0
 
     - name: Set correct ownership and permissions for config
       ansible.builtin.file:
@@ -38,3 +40,9 @@
         owner: "{{ target_user }}"
         group: "{{ target_user }}"
         mode: '0600'
+      when: fetch_result is changed  # Устанавливаем права только если файл скопирован
+
+    - name: Debug fetch result
+      ansible.builtin.debug:
+        msg: "Fetch result: {{ fetch_result }}"
+      when: fetch_result is failed  # Показываем детали ошибки
