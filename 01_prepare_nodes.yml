@@ -4,6 +4,7 @@
   become: yes
   vars:
     k8s_version: "1.28.5"
+    ansible_distribution_release: "bookworm"  # Установите нужный релиз (например, bookworm для Debian 12)
   tasks:
     - name: Disable swap
       ansible.builtin.shell: |
@@ -46,7 +47,7 @@
 
     - name: Add Docker repository
       ansible.builtin.apt_repository:
-        repo: "deb [arch=amd64] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+        repo: "deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/docker.gpg] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
         state: present
 
     - name: Install containerd
