@@ -4,7 +4,7 @@
   become: yes  # Используем sudo для создания директорий и установки прав
   vars:
     k8s_version: "1.28.15"  # Синхронизировано с предыдущими файлами
-    target_user: "root"  # Замените на нужного пользователя (например, ваш SSH-логин, если не root)
+    target_user: "root"  # Замените на нужного пользователя, если не root
     ansible_user_dir: "{{ '/root' if target_user == 'root' else '/home/' + target_user }}"  # Динамический путь
   tasks:
     - name: Ensure target user exists
@@ -29,6 +29,8 @@
         dest: "{{ ansible_user_dir }}/.kube/config"
         flat: yes
       delegate_to: "{{ groups['k8s_master'][0] }}"
+      become: yes  # Выполняем от root для доступа к /root
+      become_user: root
 
     - name: Set correct ownership and permissions for config
       ansible.builtin.file:
