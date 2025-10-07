@@ -4,14 +4,23 @@
   become: yes  # Используем sudo для создания директорий и установки прав
   vars:
     k8s_version: "1.28.15"  # Синхронизировано с предыдущими файлами
-    ansible_user_dir: "/home/{{ ansible_user }}"  # Динамический путь к домашней директории текущего пользователя
+    target_user: "root"  # Замените на нужного пользователя (например, root или ваш SSH-логин)
+    ansible_user_dir: "/home/{{ target_user }}"  # Путь к домашней директории целевого пользователя
   tasks:
-    - name: Create .kube directory for current user
+    - name: Ensure target user exists
+      ansible.builtin.user:
+        name: "{{ target_user }}"
+        home: "{{ ansible_user_dir }}"
+        create_home: yes
+        state: present
+      when: target_user != "root"  # Не создаём root, если уже существует
+
+    - name: Create .kube directory for target user
       ansible.builtin.file:
         path: "{{ ansible_user_dir }}/.kube"
         state: directory
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
         mode: '0755'
 
     - name: Copy admin config from master node
@@ -24,6 +33,6 @@
     - name: Set correct ownership and permissions for config
       ansible.builtin.file:
         path: "{{ ansible_user_dir }}/.kube/config"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
         mode: '0600'
