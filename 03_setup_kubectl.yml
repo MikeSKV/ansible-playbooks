@@ -53,21 +53,32 @@
         msg: "SSH test output: {{ ssh_test.stdout }}"
       when: ssh_test.rc == 0
 
-    - name: Copy kubeconfig to ansible-control node
-      ansible.builtin.fetch:
+    - name: Create temporary copy of admin.conf
+      ansible.builtin.copy:
         src: /etc/kubernetes/admin.conf
+        dest: /tmp/admin.conf
+        remote_src: yes
+        mode: '0600'
+      become: yes
+      become_user: root
+
+    - name: Synchronize admin.conf to ansible-control
+      ansible.posix.synchronize:
+        src: /tmp/admin.conf
         dest: /root/.kube/config
-        flat: yes
+        mode: push
+        rsync_opts:
+          - "--chmod=0600"
       delegate_to: "{{ groups['control'][0] }}"
       become: yes
-      become_user: root  # Повышаем привилегии для доступа к файлу
-      register: fetch_result
-      failed_when: "'Permission denied' in fetch_result.msg or 'does not exist' in fetch_result.msg"
+      become_user: root
 
-    - name: Debug fetch result if failed
-      ansible.builtin.debug:
-        msg: "Fetch failed: {{ fetch_result.msg }}"
-      when: fetch_result.failed
+    - name: Remove temporary copy of admin.conf
+      ansible.builtin.file:
+        path: /tmp/admin.conf
+        state: absent
+      become: yes
+      become_user: root
 
     - name: Update kubeconfig with master node IP
       ansible.builtin.replace:
@@ -75,7 +86,7 @@
         regexp: 'server: https://127.0.0.1:6443'
         replace: "server: https://{{ hostvars['k8s-master-01']['ansible_default_ipv4']['address'] }}:6443"
       delegate_to: "{{ groups['control'][0] }}"
-      when: not fetch_result.failed
+      when: not fetch_result.failed | default(false)
 
     - name: Set correct permissions on kubeconfig
       ansible.builtin.file:
@@ -84,7 +95,7 @@
         group: root
         mode: '0600'
       delegate_to: "{{ groups['control'][0] }}"
-      when: not fetch_result.failed
+      when: not fetch_result.failed | default(false)
 
     - name: Install kubectl on ansible-control node
       package:
