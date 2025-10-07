@@ -3,8 +3,8 @@
   hosts: k8s_all
   become: yes
   vars:
-    k8s_version: "1.28.6"  # Обновите на доступную версию, проверив apt policy kubelet
-    ansible_distribution_release: "bookworm"  # Укажите вашу версию Debian
+    k8s_version: "1.28.15-1.1"  # Замените на доступную версию из 'apt policy kubelet' (например, 1.28.15-1.1)
+    ansible_distribution_release: "bookworm"  # Укажите вашу версию Debian (bullseye/bookworm/trixie)
   tasks:
     - name: Disable swap
       ansible.builtin.shell: |
@@ -50,6 +50,10 @@
         repo: "deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/docker.gpg] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
         state: present
 
+    - name: Update apt cache for Docker
+      ansible.builtin.apt:
+        update_cache: yes
+
     - name: Install containerd
       package:
         name: containerd.io
@@ -79,7 +83,7 @@
         state: present
         filename: kubernetes
 
-    - name: Update apt cache
+    - name: Update apt cache for Kubernetes
       ansible.builtin.apt:
         update_cache: yes
 
@@ -90,7 +94,6 @@
           - kubeadm={{ k8s_version }}
           - kubectl={{ k8s_version }}
         state: present
-        allow_downgrade: yes
 
     - name: Hold Kubernetes packages to prevent auto-update
       ansible.builtin.shell: |
