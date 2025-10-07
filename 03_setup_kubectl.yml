@@ -3,13 +3,23 @@
   hosts: k8s_master
   become: yes
   tasks:
+    - name: Check if admin.conf exists on master
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: admin_conf_stat
+
+    - name: Fail if admin.conf is missing
+      ansible.builtin.fail:
+        msg: "File /etc/kubernetes/admin.conf not found on k8s-master-01. Please verify its existence and permissions."
+      when: not admin_conf_stat.stat.exists
+
     - name: Copy kubeconfig to ansible-control node
       ansible.builtin.fetch:
         src: /etc/kubernetes/admin.conf
         dest: /root/.kube/config
         flat: yes
       delegate_to: "{{ groups['control'][0] }}"
-      become: yes  # Выполняем от root для доступа к /root
+      become: yes  # Убедимся, что задача выполняется от root
       become_user: root
 
     - name: Update kubeconfig with master node IP
