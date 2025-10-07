@@ -7,7 +7,7 @@
     ansible_become: yes
     ansible_become_user: root
     ansible_become_method: sudo
-    calico_version: "v3.27.3"  # Проверьте актуальность на https://projectcalico.docs.tigera.io
+    calico_version: "v3.28.4"  # Проверьте актуальность на https://projectcalico.docs.tigera.io
     pod_cidr: "10.244.0.0/16"
   tasks:
     - name: Apply Calico CNI manifest
