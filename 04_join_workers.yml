@@ -1,49 +1,72 @@
 ---
 - name: Join worker nodes to Kubernetes cluster
-  hosts: k8s_workers
+  hosts: k8s_master  # Сначала на мастере для генерации токена
   become: yes
   vars:
     ansible_user: adminskv
     ansible_become: yes
     ansible_become_user: root
     ansible_become_method: sudo
-    kubeadm_join_command: "kubeadm join 192.168.1.138:6443 --token m0by9g.yfwt19sebgdumzzw --discovery-token-ca-cert-hash sha256:401d029ee4973000f6dfb7d008ef243b22404c382e9a6a513dba6708d623763c"
+    k8s_version: "1.28.15"  # Синхронизировано с 01_prepare_nodes.yml
+  tasks:
+    - name: Generate kubeadm join command on master
+      ansible.builtin.command: kubeadm token create --print-join-command
+      register: join_command_raw
+      changed_when: true
+
+    - name: Set join command fact
+      ansible.builtin.set_fact:
+        kubeadm_join_command: "{{ join_command_raw.stdout }}"
+
+    - name: Debug join command
+      ansible.builtin.debug:
+        msg: "Generated join command: {{ kubeadm_join_command }}"
+
+    - name: Save join command to file on master (for manual reference)
+      ansible.builtin.copy:
+        content: "{{ kubeadm_join_command }}"
+        dest: /tmp/kubeadm-join-command.txt
+        mode: '0644'
+      when: join_command_raw.rc == 0
+
+- name: Join worker nodes to Kubernetes cluster
+  hosts: k8s_workers  # Теперь на воркерах
+  become: yes
+  vars:
+    ansible_user: adminskv
+    ansible_become: yes
+    ansible_become_user: root
+    ansible_become_method: sudo
+    k8s_version: "1.28.15"
   tasks:
     - name: Install Kubernetes components on worker nodes
-      ansible.builtin.apt:
-        name: "{{ item }}"
+      ansible.builtin.package:
+        name:
+          - kubeadm={{ k8s_version }}
+          - kubelet={{ k8s_version }}
+          - kubectl={{ k8s_version }}
         state: present
         update_cache: yes
-      loop:
-        - kubeadm
-        - kubelet
-        - kubectl
-      become: yes
-      become_user: root
 
-    - name: Hold Kubernetes packages
-      ansible.builtin.apt:
-        name: "{{ item }}"
-        state: present
-        update_cache: yes
-        install_recommends: no
-      loop:
-        - kubeadm
-        - kubelet
-        - kubectl
-      register: hold_result
-      become: yes
-      become_user: root
+    - name: Hold Kubernetes packages to prevent auto-update
+      ansible.builtin.shell: apt-mark hold kubeadm kubelet kubectl
+      changed_when: false
 
     - name: Join node to Kubernetes cluster
-      ansible.builtin.command: "{{ kubeadm_join_command }}"
+      ansible.builtin.command: "{{ hostvars[groups['k8s_master'][0]]['kubeadm_join_command'] }}"
       register: join_result
       retries: 3
-      delay: 5
+      delay: 10  # Увеличена задержка для стабильности
       until: join_result.rc == 0
       failed_when: join_result.rc != 0
 
     - name: Debug join result
       ansible.builtin.debug:
-        msg: "Join result: {{ join_result.rc }}, output: {{ join_result.stdout }}"
+        msg: "Worker {{ inventory_hostname }} joined successfully. Output: {{ join_result.stdout }}"
+
+    - name: Restart kubelet after join
+      ansible.builtin.systemd:
+        name: kubelet
+        state: restarted
+        enabled: yes
       when: join_result.rc == 0
