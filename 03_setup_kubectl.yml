@@ -1,48 +1,42 @@
 ---
-- name: Setup kubectl on control node
-  hosts: control
-  become: yes  # Используем sudo для создания директорий
-  vars:
-    k8s_version: "1.28.15"  # Синхронизировано с предыдущими файлами
-    target_user: "adminskv"  # Замените на нужного пользователя, если не root (например, ваш SSH-логин)
-    ansible_user_dir: "{{ '/root' if target_user == 'root' else '/home/' + target_user }}"  # Динамический путь
+- name: Setup kubectl access on ansible-control node
+  hosts: k8s_master
+  become: yes
   tasks:
-    - name: Ensure target user exists
-      ansible.builtin.user:
-        name: "{{ target_user }}"
-        home: "{{ ansible_user_dir }}"
-        create_home: yes
-        state: present
-      when: target_user != "root"  # Не создаём root, если уже существует
-
-    - name: Create .kube directory for target user
-      ansible.builtin.file:
-        path: "{{ ansible_user_dir }}/.kube"
-        state: directory
-        owner: "{{ target_user }}"
-        group: "{{ target_user }}"
-        mode: '0755'
-
-    - name: Copy admin config from master node
+    - name: Copy kubeconfig to ansible-control node
       ansible.builtin.fetch:
         src: /etc/kubernetes/admin.conf
-        dest: "{{ ansible_user_dir }}/.kube/config"
+        dest: /root/.kube/config
         flat: yes
-      delegate_to: "{{ groups['k8s_master'][0] }}"
-      become: yes  # Выполняем от root
-      become_user: root
-      register: fetch_result
-      failed_when: fetch_result.rc != 0
+      delegate_to: "{{ groups['control'][0] }}"
 
-    - name: Set correct ownership and permissions for config
+    - name: Update kubeconfig with master node IP
+      ansible.builtin.replace:
+        path: /root/.kube/config
+        regexp: 'server: https://127.0.0.1:6443'
+        replace: "server: https://{{ hostvars['k8s-master-01']['ansible_default_ipv4']['address'] }}:6443"
+      delegate_to: "{{ groups['control'][0] }}"
+
+    - name: Set correct permissions on kubeconfig
       ansible.builtin.file:
-        path: "{{ ansible_user_dir }}/.kube/config"
-        owner: "{{ target_user }}"
-        group: "{{ target_user }}"
+        path: /root/.kube/config
+        owner: root
+        group: root
         mode: '0600'
-      when: fetch_result is changed  # Устанавливаем права только если файл скопирован
+      delegate_to: "{{ groups['control'][0] }}"
 
-    - name: Debug fetch result
+    - name: Install kubectl on ansible-control node
+      package:
+        name: kubectl
+        state: present
+      delegate_to: "{{ groups['control'][0] }}"
+
+    - name: Verify kubectl access
+      ansible.builtin.shell: |
+        kubectl get nodes
+      register: kubectl_nodes
+      delegate_to: "{{ groups['control'][0] }}"
+
+    - name: Display nodes info
       ansible.builtin.debug:
-        msg: "Fetch result: {{ fetch_result }}"
-      when: fetch_result is failed  # Показываем детали ошибки
+        msg: "{{ kubectl_nodes.stdout }}"
