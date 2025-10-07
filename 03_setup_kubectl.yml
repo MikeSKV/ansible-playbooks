@@ -1,28 +1,29 @@
 ---
 - name: Setup kubectl on control node
   hosts: control
-  become: yes
+  become: yes  # Используем sudo для создания директорий и установки прав
   vars:
     k8s_version: "1.28.15"  # Синхронизировано с предыдущими файлами
+    ansible_user_dir: "/home/{{ ansible_user }}"  # Динамический путь к домашней директории текущего пользователя
   tasks:
-    - name: Create .kube directory for root user
+    - name: Create .kube directory for current user
       ansible.builtin.file:
-        path: /root/.kube
+        path: "{{ ansible_user_dir }}/.kube"
         state: directory
-        owner: root
-        group: root
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
         mode: '0755'
 
     - name: Copy admin config from master node
       ansible.builtin.fetch:
         src: /etc/kubernetes/admin.conf
-        dest: /root/.kube/config
+        dest: "{{ ansible_user_dir }}/.kube/config"
         flat: yes
       delegate_to: "{{ groups['k8s_master'][0] }}"
 
     - name: Set correct ownership and permissions for config
       ansible.builtin.file:
-        path: /root/.kube/config
-        owner: root
-        group: root
+        path: "{{ ansible_user_dir }}/.kube/config"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
         mode: '0600'
