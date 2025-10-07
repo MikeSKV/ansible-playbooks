@@ -4,7 +4,7 @@
   become: yes  # Используем sudo для создания директорий
   vars:
     k8s_version: "1.28.15"  # Синхронизировано с предыдущими файлами
-    target_user: "root"  # Замените на нужного пользователя, если не root (например, ваш SSH-логин)
+    target_user: "adminskv"  # Замените на нужного пользователя, если не root (например, ваш SSH-логин)
     ansible_user_dir: "{{ '/root' if target_user == 'root' else '/home/' + target_user }}"  # Динамический путь
   tasks:
     - name: Ensure target user exists
