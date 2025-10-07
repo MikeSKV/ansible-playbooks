@@ -1,13 +1,13 @@
 ---
 - name: Join worker nodes to Kubernetes cluster
-  hosts: k8s_worker
+  hosts: k8s_workers
   become: yes
   vars:
     ansible_user: adminskv
     ansible_become: yes
     ansible_become_user: root
     ansible_become_method: sudo
-    kubeadm_join_command: "kubeadm join 192.168.1.138:6443 --token abcdef.0123456789abcdef --discovery-token-ca-cert-hash sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+    kubeadm_join_command: "kubeadm join 192.168.1.138:6443 --token m0by9g.yfwt19sebgdumzzw --discovery-token-ca-cert-hash sha256:401d029ee4973000f6dfb7d008ef243b22404c382e9a6a513dba6708d623763c"
   tasks:
     - name: Install Kubernetes components on worker nodes
       ansible.builtin.apt:
