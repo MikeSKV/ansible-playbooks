@@ -3,7 +3,7 @@
   hosts: k8s_master
   become: yes
   vars:
-    ansible_user: adminskv  # Укажите пользователя, от которого запускается Ansible
+    ansible_user: adminskv
     ansible_become: yes
     ansible_become_user: root
     ansible_become_method: sudo
@@ -121,13 +121,28 @@
       become_user: root
       retries: 3
       delay: 5
-      until: not kubectl_install.failed  # Используем failed вместо rc
+      until: not kubectl_install.failed
       failed_when: kubectl_install.failed
 
     - name: Debug kubectl install result
       ansible.builtin.debug:
         msg: "kubectl install result: {{ kubectl_install }}"
       when: kubectl_install.failed
+
+    - name: Check API server connectivity
+      ansible.builtin.command: curl -k https://{{ hostvars['k8s-master-01']['ansible_default_ipv4']['address'] }}:6443
+      register: api_check
+      delegate_to: "{{ groups['control'][0] }}"
+      become: yes
+      become_user: root
+      ignore_errors: yes
+
+    - name: Debug API server connectivity
+      ansible.builtin.debug:
+        msg: "API server check: {{ api_check.rc }}, output: {{ api_check.stdout }}"
+      delegate_to: "{{ groups['control'][0] }}"
+      become: yes
+      become_user: root
 
     - name: Verify kubectl access
       ansible.builtin.shell: |
