@@ -9,6 +9,8 @@
         dest: /root/.kube/config
         flat: yes
       delegate_to: "{{ groups['control'][0] }}"
+      become: yes  # Выполняем от root для доступа к /root
+      become_user: root
 
     - name: Update kubeconfig with master node IP
       ansible.builtin.replace:
