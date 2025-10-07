@@ -10,15 +10,15 @@
 
     - name: Fail if admin.conf is missing
       ansible.builtin.fail:
-        msg: "File /etc/kubernetes/admin.conf not found on k8s-master-01. Please verify its existence and permissions."
+        msg: "File /etc/kubernetes/admin.conf not found on k8s-master-01. Please verify its existence and permissions or rerun 02_init_master.yml."
       when: not admin_conf_stat.stat.exists
 
-    - name: Create .kube directory for adminskv
+    - name: Create .kube directory for root
       ansible.builtin.file:
-        path: /home/adminskv/.kube
+        path: /root/.kube
         state: directory
-        owner: adminskv
-        group: adminskv
+        owner: root
+        group: root
         mode: '0755'
       delegate_to: "{{ groups['control'][0] }}"
       become: yes
@@ -27,7 +27,7 @@
     - name: Copy kubeconfig to ansible-control node
       ansible.builtin.fetch:
         src: /etc/kubernetes/admin.conf
-        dest: /home/adminskv/.kube/config
+        dest: /root/.kube/config
         flat: yes
       delegate_to: "{{ groups['control'][0] }}"
       become: yes
@@ -35,16 +35,16 @@
 
     - name: Update kubeconfig with master node IP
       ansible.builtin.replace:
-        path: /home/adminskv/.kube/config
+        path: /root/.kube/config
         regexp: 'server: https://127.0.0.1:6443'
         replace: "server: https://{{ hostvars['k8s-master-01']['ansible_default_ipv4']['address'] }}:6443"
       delegate_to: "{{ groups['control'][0] }}"
 
     - name: Set correct permissions on kubeconfig
       ansible.builtin.file:
-        path: /home/adminskv/.kube/config
-        owner: adminskv
-        group: adminskv
+        path: /root/.kube/config
+        owner: root
+        group: root
         mode: '0600'
       delegate_to: "{{ groups['control'][0] }}"
 
@@ -62,7 +62,7 @@
       register: kubectl_nodes
       delegate_to: "{{ groups['control'][0] }}"
       become: yes
-      become_user: adminskv  # Проверяем от имени adminskv
+      become_user: root
 
     - name: Display nodes info
       ansible.builtin.debug:
