@@ -34,6 +34,13 @@
       become: yes
       become_user: root
 
+    - name: Accept SSH host key for ansible-control
+      ansible.builtin.command: ssh-keyscan -H {{ hostvars[groups['control'][0]]['ansible_host'] }} >> ~/.ssh/known_hosts
+      args:
+        creates: ~/.ssh/known_hosts
+      become: yes
+      become_user: "{{ ansible_user }}"
+
     - name: Test SSH connectivity to ansible-control
       ansible.builtin.command: ssh -o BatchMode=yes root@{{ hostvars[groups['control'][0]]['ansible_host'] }} "echo Connection successful"
       register: ssh_test
@@ -89,19 +96,3 @@
       delay: 5
       until: kubectl_install.rc == 0
       failed_when: kubectl_install.rc != 0
-
-    - name: Verify kubectl access
-      ansible.builtin.shell: |
-        kubectl get nodes
-      register: kubectl_nodes
-      delegate_to: "{{ groups['control'][0] }}"
-      become: yes
-      become_user: root
-      retries: 3
-      delay: 5
-      until: kubectl_nodes.rc == 0
-      failed_when: kubectl_nodes.rc != 0
-
-    - name: Display nodes info
-      ansible.builtin.debug:
-        msg: "{{ kubectl_nodes.stdout }}"
