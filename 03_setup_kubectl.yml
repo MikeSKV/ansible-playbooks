@@ -2,6 +2,11 @@
 - name: Setup kubectl access on ansible-control node
   hosts: k8s_master
   become: yes
+  vars:
+    ansible_user: adminskv  # Укажите пользователя, от которого запускается Ansible
+    ansible_become: yes
+    ansible_become_user: root
+    ansible_become_method: sudo
   tasks:
     - name: Check if admin.conf exists on master
       ansible.builtin.stat:
@@ -28,6 +33,16 @@
       delegate_to: "{{ groups['control'][0] }}"
       become: yes
       become_user: root
+
+    - name: Test SSH connectivity to ansible-control
+      ansible.builtin.command: ssh -o BatchMode=yes root@{{ hostvars[groups['control'][0]]['ansible_host'] }} "echo Connection successful"
+      register: ssh_test
+      failed_when: ssh_test.rc != 0
+
+    - name: Debug SSH test result
+      ansible.builtin.debug:
+        msg: "SSH test output: {{ ssh_test.stdout }}"
+      when: ssh_test.rc == 0
 
     - name: Copy kubeconfig to ansible-control node
       ansible.builtin.fetch:
