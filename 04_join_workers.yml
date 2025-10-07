@@ -7,7 +7,7 @@
     ansible_become: yes
     ansible_become_user: root
     ansible_become_method: sudo
-    kubeadm_join_command: "kubeadm join 192.168.1.138:6443 --token y00b4t.7fxpthwwwgc4r21g --discovery-token-ca-cert-hash sha256:c0f7656f6e610baa22b9466894279904af0f2eab7ab086de25a403dc28911db6"
+    kubeadm_join_command: "kubeadm join 192.168.1.138:6443 --token rw9okk.9vhcehcgijl03xm8 --discovery-token-ca-cert-hash sha256:7a388bfe99f8a807ca4474092f686231192bb46bb1c976526fea8211c14f9623"
   tasks:
     - name: Install Kubernetes components on worker nodes
       ansible.builtin.apt:
