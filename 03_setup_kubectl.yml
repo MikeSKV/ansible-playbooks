@@ -54,12 +54,14 @@
         msg: "SSH test output: {{ ssh_test.stdout }}"
       when: ssh_test.rc == 0
 
-    - name: Create temporary copy of admin.conf
+    - name: Create temporary copy of admin.conf with readable permissions
       ansible.builtin.copy:
         src: /etc/kubernetes/admin.conf
         dest: /tmp/admin.conf
         remote_src: yes
-        mode: '0600'
+        mode: '0644'  # Делаем файл читаемым для всех
+        owner: root
+        group: root
       become: yes
       become_user: root
 
@@ -75,29 +77,7 @@
         msg: "Temp file exists: {{ temp_stat.stat.exists }}, path: {{ temp_stat.stat.path }}, readable: {{ temp_stat.stat.readable }}, mode: {{ temp_stat.stat.mode }}, owner: {{ temp_stat.stat.pw_name }}"
       when: temp_stat.stat.exists
 
-    - name: Synchronize admin.conf to ansible-control with timeout
-      ansible.posix.synchronize:
-        src: /tmp/admin.conf
-        dest: /root/.kube/config
-        mode: push
-        rsync_opts:
-          - "--chmod=0600"
-        rsync_timeout: 30
-      delegate_to: "{{ groups['control'][0] }}"
-      become: yes
-      become_user: root
-      register: sync_result
-      retries: 3
-      delay: 5
-      until: sync_result is success
-      ignore_errors: yes
-
-    - name: Debug synchronize result
-      ansible.builtin.debug:
-        msg: "Synchronize result: {{ sync_result.msg }}"
-      when: sync_result.failed
-
-    - name: Copy admin.conf to ansible-control using scp as fallback
+    - name: Copy admin.conf to ansible-control using scp
       ansible.builtin.command: scp /tmp/admin.conf root@{{ hostvars[groups['control'][0]]['ansible_host'] }}:/root/.kube/config
       become: yes
       become_user: root
@@ -105,7 +85,6 @@
       retries: 3
       delay: 5
       until: scp_result.rc == 0
-      when: sync_result.failed | default(true)
 
     - name: Remove temporary copy of admin.conf
       ansible.builtin.file:
@@ -113,4 +92,46 @@
         state: absent
       become: yes
       become_user: root
-      when: sync_result.changed | default(false) or scp_result.changed | default(false)
+      when: scp_result.changed
+
+    - name: Update kubeconfig with master node IP
+      ansible.builtin.replace:
+        path: /root/.kube/config
+        regexp: 'server: https://127.0.0.1:6443'
+        replace: "server: https://{{ hostvars['k8s-master-01']['ansible_default_ipv4']['address'] }}:6443"
+      delegate_to: "{{ groups['control'][0] }}"
+      when: scp_result.changed
+
+    - name: Set correct permissions on kubeconfig
+      ansible.builtin.file:
+        path: /root/.kube/config
+        owner: root
+        group: root
+        mode: '0600'
+      delegate_to: "{{ groups['control'][0] }}"
+      when: scp_result.changed
+
+    - name: Install kubectl on ansible-control node
+      package:
+        name: kubectl
+        state: present
+      register: kubectl_install
+      delegate_to: "{{ groups['control'][0] }}"
+      become: yes
+      become_user: root
+      retries: 3
+      delay: 5
+      until: kubectl_install.rc == 0
+      failed_when: kubectl_install.rc != 0
+
+    - name: Verify kubectl access
+      ansible.builtin.shell: |
+        kubectl get nodes
+      register: kubectl_nodes
+      delegate_to: "{{ groups['control'][0] }}"
+      become: yes
+      become_user: root
+      retries: 3
+      delay: 5
+      until: kubectl_nodes.rc == 0
+      failed_when: kubectl_nodes.rc != 0
