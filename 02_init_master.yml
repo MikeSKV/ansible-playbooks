@@ -26,18 +26,18 @@
         creates: /etc/kubernetes/admin.conf
       failed_when: kubeadm_init.rc != 0
 
-    - name: Create .kube directory for admin user
+    - name: Create .kube directory for root user
       ansible.builtin.file:
-        path: /home/admin/.kube
+        path: /root/.kube
         state: directory
-        owner: admin
-        group: admin
+        owner: root
+        group: root
         mode: '0755'
 
     - name: Copy admin config to user directory
       ansible.builtin.shell: |
-        cp -f /etc/kubernetes/admin.conf /home/admin/.kube/config
-        chown admin:admin /home/admin/.kube/config
+        cp -f /etc/kubernetes/admin.conf /root/.kube/config
+        chown root:root /root/.kube/config
 
     - name: Extract join command from kubeadm output
       ansible.builtin.set_fact:
@@ -47,8 +47,8 @@
       ansible.builtin.copy:
         content: "{{ join_command }}"
         dest: /tmp/k8s_join_command.txt
-        owner: admin
-        group: admin
+        owner: root
+        group: root
         mode: '0644'
 
     - name: Display join command for verification
