@@ -19,7 +19,7 @@
         dest: /root/.kube/config
         flat: yes
       delegate_to: "{{ groups['control'][0] }}"
-      become: yes  # Убедимся, что задача выполняется от root
+      become: yes  # Читаем файл от root на k8s-master-01
       become_user: root
 
     - name: Update kubeconfig with master node IP
