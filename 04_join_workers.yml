@@ -1,6 +1,6 @@
 ---
 - name: Join worker nodes to Kubernetes cluster
-  hosts: k8s_worker
+  hosts: k8s_workers
   become: yes
   vars:
     ansible_user: adminskv
