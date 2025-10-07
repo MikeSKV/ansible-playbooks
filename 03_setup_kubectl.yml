@@ -3,7 +3,7 @@
   hosts: k8s_master
   become: yes
   vars:
-    ansible_user: root  # Укажите пользователя, от которого запускается Ansible
+    ansible_user: adminskv  # Укажите пользователя, от которого запускается Ansible
     ansible_become: yes
     ansible_become_user: root
     ansible_become_method: sudo
