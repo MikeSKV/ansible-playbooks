@@ -10,7 +10,7 @@
 
     - name: Fail if admin.conf is missing
       ansible.builtin.fail:
-        msg: "File /etc/kubernetes/admin.conf not found on k8s-master-01. Please verify its existence and permissions or rerun 02_init_master.yml."
+        msg: "File /etc/kubernetes/admin.conf not found on k8s-master-01. Please verify its existence or rerun 02_init_master.yml."
       when: not admin_conf_stat.stat.exists
 
     - name: Create .kube directory for root
@@ -52,9 +52,14 @@
       package:
         name: kubectl
         state: present
+      register: kubectl_install
       delegate_to: "{{ groups['control'][0] }}"
       become: yes
       become_user: root
+      retries: 3
+      delay: 5
+      until: kubectl_install.rc == 0
+      failed_when: kubectl_install.rc != 0
 
     - name: Verify kubectl access
       ansible.builtin.shell: |
@@ -63,6 +68,10 @@
       delegate_to: "{{ groups['control'][0] }}"
       become: yes
       become_user: root
+      retries: 3
+      delay: 5
+      until: kubectl_nodes.rc == 0
+      failed_when: kubectl_nodes.rc != 0
 
     - name: Display nodes info
       ansible.builtin.debug:
