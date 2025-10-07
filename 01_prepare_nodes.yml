@@ -3,8 +3,8 @@
   hosts: k8s_all
   become: yes
   vars:
-    k8s_version: "1.28.5"
-    ansible_distribution_release: "bookworm"  # Установите нужный релиз (например, bookworm для Debian 12)
+    k8s_version: "1.28.6"  # Обновите на доступную версию, проверив apt policy kubelet
+    ansible_distribution_release: "bookworm"  # Укажите вашу версию Debian
   tasks:
     - name: Disable swap
       ansible.builtin.shell: |
@@ -79,12 +79,16 @@
         state: present
         filename: kubernetes
 
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+
     - name: Install kubeadm, kubelet, kubectl
       package:
         name:
-          - kubelet={{ k8s_version }}-00
-          - kubeadm={{ k8s_version }}-00
-          - kubectl={{ k8s_version }}-00
+          - kubelet={{ k8s_version }}
+          - kubeadm={{ k8s_version }}
+          - kubectl={{ k8s_version }}
         state: present
         allow_downgrade: yes
 
