@@ -17,13 +17,47 @@
 
     - name: Fail if admin.conf is missing
       ansible.builtin.fail:
-        msg: "File /etc/kubernetes/admin.conf not found on k8s-master-01. Please verify its existence or rerun 02_init_master.yml. Current path check: {{ admin_conf_stat.stat.path }}, exists: {{ admin_conf_stat.stat.exists }}"
+        msg: "File /etc/kubernetes/admin.conf not found on k8s-master-01. Please verify its existence or rerun 02_init_master.yml or perform 'kubeadm init'. Current path check: {{ admin_conf_stat.stat.path }}, exists: {{ admin_conf_stat.stat.exists }}"
       when: not admin_conf_stat.stat.exists
 
     - name: Debug file details
       ansible.builtin.debug:
         msg: "File exists: {{ admin_conf_stat.stat.exists }}, path: {{ admin_conf_stat.stat.path }}, readable: {{ admin_conf_stat.stat.readable }}, mode: {{ admin_conf_stat.stat.mode }}"
       when: admin_conf_stat.stat.exists
+
+    - name: Stop Kubernetes services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      loop:
+        - kubelet
+        - kube-apiserver
+        - kube-controller-manager
+        - kube-scheduler
+        - etcd
+      ignore_errors: yes
+
+    - name: Remove Kubernetes manifests
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/kubernetes/manifests/kube-apiserver.yaml
+        - /etc/kubernetes/manifests/kube-controller-manager.yaml
+        - /etc/kubernetes/manifests/kube-scheduler.yaml
+        - /etc/kubernetes/manifests/etcd.yaml
+      ignore_errors: yes
+
+    - name: Remove etcd data
+      ansible.builtin.file:
+        path: /var/lib/etcd
+        state: absent
+      ignore_errors: yes
+
+    - name: Reset kubeadm
+      ansible.builtin.command: kubeadm reset -f
+      ignore_errors: yes
 
     - name: Create .kube directory for root
       ansible.builtin.file:
@@ -143,6 +177,24 @@
       delegate_to: "{{ groups['control'][0] }}"
       become: yes
       become_user: root
+
+    - name: Verify API server is running on master
+      ansible.builtin.command: systemctl status kube-apiserver
+      register: api_status
+      become: yes
+      become_user: root
+      ignore_errors: yes
+
+    - name: Debug API server status
+      ansible.builtin.debug:
+        msg: "API server status: {{ api_status.rc }}, output: {{ api_status.stdout }}"
+      become: yes
+      become_user: root
+
+    - name: Fail if API server is not running
+      ansible.builtin.fail:
+        msg: "kube-apiserver is not running on k8s-master-01. Please ensure 'kubeadm init' has been run successfully. Output: {{ api_status.stdout }}"
+      when: api_status.rc != 0
 
     - name: Verify kubectl access
       ansible.builtin.shell: |
