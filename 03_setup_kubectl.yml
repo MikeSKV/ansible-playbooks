@@ -10,8 +10,13 @@
 
     - name: Fail if admin.conf is missing
       ansible.builtin.fail:
-        msg: "File /etc/kubernetes/admin.conf not found on k8s-master-01. Please verify its existence or rerun 02_init_master.yml."
+        msg: "File /etc/kubernetes/admin.conf not found on k8s-master-01. Please verify its existence or rerun 02_init_master.yml. Current path check: {{ admin_conf_stat.stat.path }}"
       when: not admin_conf_stat.stat.exists
+
+    - name: Debug file details
+      ansible.builtin.debug:
+        msg: "File exists: {{ admin_conf_stat.stat.exists }}, path: {{ admin_conf_stat.stat.path }}, readable: {{ admin_conf_stat.stat.readable }}, mode: {{ admin_conf_stat.stat.mode }}"
+      when: admin_conf_stat.stat.exists
 
     - name: Create .kube directory for root
       ansible.builtin.file:
